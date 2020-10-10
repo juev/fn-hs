@@ -1,8 +1,12 @@
 module Main where
 
-import Data.Time ( getZonedTime, formatTime, defaultTimeLocale )
+import Data.Time
 
 main :: IO ()
 main = do
     now <- getZonedTime
-    print $ formatTime defaultTimeLocale "%Y%m%d-%H%M%S" now
+    print $ getTime now
+
+getTime :: ZonedTime -> String
+getTime now = do
+    formatTime defaultTimeLocale "%Y%m%d-%H%M%S" now
