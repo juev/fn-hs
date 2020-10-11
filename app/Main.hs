@@ -1,4 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE RecordWildCards    #-}
 
 module Main where
 
@@ -8,7 +10,9 @@ import           Data.Time                 (ZonedTime, defaultTimeLocale,
                                             formatTime, getZonedTime)
 import           System.Directory          (getCurrentDirectory)
 -- import           System.Exit
-import           System.Process
+import           System.Console.CmdArgs    (Data, Default (def), Typeable,
+                                            cmdArgs, help, summary, (&=))
+import           System.Process            (readProcessWithExitCode)
 import           Text.Printf               (printf)
 
 shaDigestLength = 8
@@ -18,11 +22,12 @@ type Mill = Bool
 
 main :: IO ()
 main = do
+    Fn {..} <- cmdArgs fn
     currentDirectory <- getCurrentDirectory
     putStrLn $ "Current directory: " ++ currentDirectory
     gitSHADigest <- getGitSHADigest
     now <- getZonedTime
-    let dataTime = getTime now False in
+    let dataTime = getTime now milli in
         printf "Result: %s-%s-%s" dataTime gitSHADigest . shaDigest $ dataTime
 
 getTime :: ZonedTime -> Mill -> String
@@ -39,3 +44,11 @@ getGitSHADigest = do
 
 removeEndOfLine :: String -> String
 removeEndOfLine = filter (/= '\n')
+
+data Fn = Fn {milli :: Bool} deriving (Show, Data, Typeable)
+
+fn = Fn
+    {milli = def &= help "Use milliseconds"
+    } &=
+    help "`fn` is a tool for generating, and parsing, file names based on\ncurrent date, time, process id and gitsha." &=
+    summary "Fn v0.1.0.0, (C) Denis Evsyukov"
