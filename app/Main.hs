@@ -8,27 +8,64 @@ import           Data.ByteString.Lazy.UTF8 as BSU (fromString)
 import           Data.Digest.Pure.SHA      (sha256, showDigest)
 import           Data.Time                 (ZonedTime, defaultTimeLocale,
                                             formatTime, getZonedTime)
-import           System.Directory          (getCurrentDirectory)
--- import           System.Exit
-import           System.Console.CmdArgs    (Data, Default (def), Typeable,
-                                            cmdArgs, help, summary, (&=))
 import           System.Process            (readProcessWithExitCode)
 import           Text.Printf               (printf)
+import           Options.Applicative
+import           Data.Semigroup ((<>))
 
+shaDigestLength :: Int
 shaDigestLength = 8
+
+gitSHAsize :: Int
 gitSHAsize = 8
 
 type Mill = Bool
 
+data Options = Options
+  { timestamp  :: Bool
+  , milli      :: Bool
+  , prochash   :: Bool
+  , gitsha     :: Bool }
+
+options :: Parser Options
+options = Options
+      <$> switch
+          ( short 't'
+         <> help "return timestamp only." )
+      <*> switch
+          ( short 'm'
+         <> help "include milliseconds." )
+      <*> switch
+          ( short 'p'
+         <> help "return a prochash." )
+      <*> switch
+          ( short 'g'
+         <> help "return current git sha." )
+
 main :: IO ()
-main = do
-    Fn {..} <- cmdArgs fn
-    currentDirectory <- getCurrentDirectory
-    putStrLn $ "Current directory: " ++ currentDirectory
-    gitSHADigest <- getGitSHADigest
-    now <- getZonedTime
-    let dataTime = getTime now milli in
-        printf "Result: %s-%s-%s" dataTime gitSHADigest . shaDigest $ dataTime
+main = parse =<< execParser opts
+  where
+    opts = info (options <**> helper)
+      ( fullDesc
+        <> header "fn-hs - a tool for generating, and parsing file names" )
+
+parse :: Options -> IO ()
+parse (Options True milli _ _) = do
+  now <- getZonedTime
+  let dataTime = getTime now milli in
+    printf "%s" dataTime
+parse (Options _ _ True _) = do
+  gitSHADigest <- getGitSHADigest
+  printf "%s" gitSHADigest
+parse (Options _ _ _ True) = do
+  now <- getZonedTime
+  let dataTime = getTime now False in
+    printf "%s" $ shaDigest dataTime
+parse (Options _ _ _ _) = do
+  now <- getZonedTime
+  gitSHADigest <- getGitSHADigest
+  let dataTime = getTime now False in
+    printf "%s-%s-%s" dataTime gitSHADigest . shaDigest $ dataTime
 
 getTime :: ZonedTime -> Mill -> String
 getTime now True  = formatTime defaultTimeLocale "%Y%m%d-%H%M%S_%-q" now
@@ -44,11 +81,3 @@ getGitSHADigest = do
 
 removeEndOfLine :: String -> String
 removeEndOfLine = filter (/= '\n')
-
-data Fn = Fn {milli :: Bool} deriving (Show, Data, Typeable)
-
-fn = Fn
-    {milli = def &= help "Use milliseconds"
-    } &=
-    help "`fn` is a tool for generating, and parsing, file names based on\ncurrent date, time, process id and gitsha." &=
-    summary "Fn v0.1.0.0, (C) Denis Evsyukov"
